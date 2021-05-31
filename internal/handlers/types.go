@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"github.com/tstranex/u2f"
-
 	"github.com/authelia/authelia/internal/authentication"
 )
 
@@ -34,8 +32,7 @@ type signTOTPRequestBody struct {
 
 // signU2FRequestBody model of the request body of U2F authentication endpoint.
 type signU2FRequestBody struct {
-	SignResponse u2f.SignResponse `json:"signResponse"`
-	TargetURL    string           `json:"targetURL"`
+	TargetURL string `json:"targetURL"`
 }
 
 type signDuoRequestBody struct {

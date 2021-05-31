@@ -3,10 +3,26 @@ package handlers
 import (
 	"fmt"
 
+	"github.com/duo-labs/webauthn/webauthn"
+	"github.com/sirupsen/logrus"
 	"github.com/tstranex/u2f"
 
 	"github.com/authelia/authelia/internal/middlewares"
 )
+
+var web *webauthn.WebAuthn
+
+func init() {
+	w, err := webauthn.New(&webauthn.Config{
+		RPDisplayName: "Authelia",                       // Display Name for your site
+		RPID:          "example.com",                    // Generally the FQDN for your site
+		RPOrigin:      "https://login.example.com:8080", // The origin URL for WebAuthn requests
+	})
+	if err != nil {
+		logrus.Panic(err)
+	}
+	web = w
+}
 
 var u2fConfig = &u2f.Config{
 	// Chrome 66+ doesn't return the device's attestation
@@ -34,21 +50,17 @@ func secondFactorU2FIdentityFinish(ctx *middlewares.AutheliaCtx, username string
 		return
 	}
 
-	appID := fmt.Sprintf("%s://%s", ctx.XForwardedProto(), ctx.XForwardedHost())
-	ctx.Logger.Tracef("U2F appID is %s", appID)
+	userSession := ctx.GetSession()
 
-	var trustedFacets = []string{appID}
-
-	challenge, err := u2f.NewChallenge(appID, trustedFacets)
+	options, sessionData, err := web.BeginRegistration(&userSession)
 
 	if err != nil {
-		ctx.Error(fmt.Errorf("Unable to generate new U2F challenge for registration: %s", err), operationFailedMessage)
+		ctx.Error(fmt.Errorf("Unable to begin webauthn registration: %s", err), operationFailedMessage)
 		return
 	}
 
 	// Save the challenge in the user session.
-	userSession := ctx.GetSession()
-	userSession.U2FChallenge = challenge
+	userSession.WebAuthnSessionData = sessionData
 	err = ctx.SaveSession(userSession)
 
 	if err != nil {
@@ -56,7 +68,7 @@ func secondFactorU2FIdentityFinish(ctx *middlewares.AutheliaCtx, username string
 		return
 	}
 
-	err = ctx.SetJSONBody(u2f.NewWebRegisterRequest(challenge, []u2f.Registration{}))
+	err = ctx.SetJSONBody(options)
 	if err != nil {
 		ctx.Logger.Errorf("Unable to create request to enrol new token: %s", err)
 	}

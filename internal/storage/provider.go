@@ -20,8 +20,8 @@ type Provider interface {
 	LoadTOTPSecret(username string) (string, error)
 	DeleteTOTPSecret(username string) error
 
-	SaveU2FDeviceHandle(username string, keyHandle []byte, publicKey []byte) error
-	LoadU2FDeviceHandle(username string) (keyHandle []byte, publicKey []byte, err error)
+	SaveWebAuthnCredential(username string, credentialBlob string) error
+	LoadWebAuthnCredential(username string) (string, error)
 
 	AppendAuthenticationLog(attempt models.AuthenticationAttempt) error
 	LoadLatestAuthenticationLogs(username string, fromDate time.Time) ([]models.AuthenticationAttempt, error)

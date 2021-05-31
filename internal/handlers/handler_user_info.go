@@ -41,7 +41,7 @@ func loadInfo(username string, storageProvider storage.Provider, userInfo *UserI
 	go func() {
 		defer wg.Done()
 
-		_, _, err := storageProvider.LoadU2FDeviceHandle(username)
+		_, err := storageProvider.LoadWebAuthnCredential(username)
 		if err != nil {
 			if err == storage.ErrNoU2FDeviceHandle {
 				return

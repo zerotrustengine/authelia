@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql/driver"
-	"encoding/base64"
 	"fmt"
 	"sort"
 	"testing"
@@ -299,42 +298,37 @@ func TestSQLProviderMethodsU2F(t *testing.T) {
 	err := provider.initialize(provider.db)
 	assert.NoError(t, err)
 
-	pretendKeyHandle := []byte("abc")
-	pretendPublicKey := []byte("123")
-	pretendKeyHandleB64 := base64.StdEncoding.EncodeToString(pretendKeyHandle)
-	pretendPublicKeyB64 := base64.StdEncoding.EncodeToString(pretendPublicKey)
+	pretendCred := "pretendCred"
 
-	args = []driver.Value{unitTestUser, pretendKeyHandleB64, pretendPublicKeyB64}
+	args = []driver.Value{unitTestUser, pretendCred}
 	mock.ExpectExec(
-		fmt.Sprintf("REPLACE INTO %s \\(username, keyHandle, publicKey\\) VALUES \\(\\?, \\?, \\?\\)", u2fDeviceHandlesTableName)).
+		fmt.Sprintf("REPLACE INTO %s \\(username, keyHandle\\) VALUES \\(\\?, \\?\\)", u2fDeviceHandlesTableName)).
 		WithArgs(args...).
 		WillReturnResult(sqlmock.NewResult(0, 1))
 
-	err = provider.SaveU2FDeviceHandle(unitTestUser, pretendKeyHandle, pretendPublicKey)
+	err = provider.SaveU2FDeviceHandle(unitTestUser, pretendCred)
 	assert.NoError(t, err)
 
 	args = []driver.Value{unitTestUser}
 	mock.ExpectQuery(
-		fmt.Sprintf("SELECT keyHandle, publicKey FROM %s WHERE username=\\?", u2fDeviceHandlesTableName)).
+		fmt.Sprintf("SELECT keyHandle FROM %s WHERE username=\\?", u2fDeviceHandlesTableName)).
 		WithArgs(args...).
-		WillReturnRows(sqlmock.NewRows([]string{"keyHandle", "publicKey"}).
-			AddRow(pretendKeyHandleB64, pretendPublicKeyB64))
+		WillReturnRows(sqlmock.NewRows([]string{"keyHandle"}).
+			AddRow(pretendCred))
 
-	keyHandle, publicKey, err := provider.LoadU2FDeviceHandle(unitTestUser)
+	credential, err := provider.LoadU2FDeviceHandle(unitTestUser)
 	assert.NoError(t, err)
-	assert.Equal(t, pretendKeyHandle, keyHandle)
-	assert.Equal(t, pretendPublicKey, publicKey)
+	assert.Equal(t, pretendCred, credential)
 
 	// Test Blank Rows.
 	mock.ExpectQuery(
-		fmt.Sprintf("SELECT keyHandle, publicKey FROM %s WHERE username=\\?", u2fDeviceHandlesTableName)).
+		fmt.Sprintf("SELECT keyHandle FROM %s WHERE username=\\?", u2fDeviceHandlesTableName)).
 		WithArgs(args...).
 		WillReturnRows(sqlmock.NewRows([]string{"keyHandle", "publicKey"}))
 
-	keyHandle, publicKey, err = provider.LoadU2FDeviceHandle(unitTestUser)
+	credential, err = provider.LoadU2FDeviceHandle(unitTestUser)
 	assert.EqualError(t, err, "No U2F device handle found")
-	assert.Equal(t, []byte(nil), keyHandle)
-	assert.Equal(t, []byte(nil), publicKey)
+	assert.Equal(t, []byte(nil), credential)
 }
 
 func TestSQLProviderMethodsIdentityVerificationTokens(t *testing.T) {

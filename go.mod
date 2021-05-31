@@ -9,6 +9,7 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/deckarep/golang-set v1.7.1
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/duo-labs/webauthn v0.0.0-20200714211715-1daaee874e43 // indirect
 	github.com/duosecurity/duo_api_golang v0.0.0-20201112143038-0e07e9f869e3
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/fasthttp/router v1.3.12

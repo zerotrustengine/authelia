@@ -100,13 +100,15 @@ func registerRoutes(configuration schema.Configuration, providers middlewares.Pr
 		middlewares.RequireFirstFactor(handlers.SecondFactorU2FIdentityFinish)))
 
 	r.POST("/api/secondfactor/u2f/register", autheliaMiddleware(
-		middlewares.RequireFirstFactor(handlers.SecondFactorU2FRegister)))
+		middlewares.RequireFirstFactor(middlewares.NewHTTPToAutheliaHandlerAdaptor(
+			handlers.SecondFactorU2FRegister))))
 
 	r.POST("/api/secondfactor/u2f/sign_request", autheliaMiddleware(
 		middlewares.RequireFirstFactor(handlers.SecondFactorU2FSignGet)))
 
 	r.POST("/api/secondfactor/u2f/sign", autheliaMiddleware(
-		middlewares.RequireFirstFactor(handlers.SecondFactorU2FSignPost(&handlers.U2FVerifierImpl{}))))
+		middlewares.RequireFirstFactor(middlewares.NewHTTPToAutheliaHandlerAdaptor(
+			handlers.SecondFactorU2FSignPost(&handlers.U2FVerifierImpl{})))))
 
 	// Configure DUO api endpoint only if configuration exists.
 	if configuration.DuoAPI != nil {

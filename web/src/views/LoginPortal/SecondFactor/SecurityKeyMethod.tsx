@@ -21,6 +21,19 @@ export enum State {
     Failure = 3,
 }
 
+// Base64 to ArrayBuffer
+function bufferDecode(value: any) {
+    return Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+}
+
+// ArrayBuffer to URLBase64
+function bufferEncode(value: any) {
+    return btoa(String.fromCharCode.apply(null, new Uint8Array(value) as any))
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=/g, "");
+}
+
 export interface Props {
     id: string;
     authenticationLevel: AuthenticationLevel;
@@ -54,24 +67,46 @@ const SecurityKeyMethod = function (props: Props) {
         try {
             triggerTimer();
             setState(State.WaitTouch);
-            const signRequest = await initiateU2FSignin();
-            const signRequests: u2fApi.SignRequest[] = [];
-            for (var i in signRequest.registeredKeys) {
-                const r = signRequest.registeredKeys[i];
-                signRequests.push({
-                    appId: signRequest.appId,
-                    challenge: signRequest.challenge,
-                    keyHandle: r.keyHandle,
-                    version: r.version,
-                });
+            const credentialRequestOptions = await initiateU2FSignin();
+            if (credentialRequestOptions.publicKey) {
+                credentialRequestOptions.publicKey.challenge = bufferDecode(
+                    credentialRequestOptions.publicKey.challenge,
+                );
+                if (credentialRequestOptions.publicKey.allowCredentials) {
+                    credentialRequestOptions.publicKey.allowCredentials.forEach(function (listItem) {
+                        listItem.id = bufferDecode(listItem.id);
+                    });
+                }
             }
-            const signResponse = await u2fApi.sign(signRequests, signInTimeout);
+
+            const assertion = (await navigator.credentials.get({
+                publicKey: credentialRequestOptions.publicKey,
+            })) as any;
+
+            const authData = assertion.response.authenticatorData;
+            const clientDataJSON = assertion.response.clientDataJSON;
+            const rawId = assertion.rawId;
+            const sig = assertion.response.signature;
+            const userHandle = assertion.response.userHandle;
+
+            const payload = {
+                id: assertion.id,
+                rawId: bufferEncode(rawId),
+                type: assertion.type,
+                response: {
+                    authenticatorData: bufferEncode(authData),
+                    clientDataJSON: bufferEncode(clientDataJSON),
+                    signature: bufferEncode(sig),
+                    userHandle: bufferEncode(userHandle),
+                },
+            };
+
             // If the request was initiated and the user changed 2FA method in the meantime,
             // the process is interrupted to avoid updating state of unmounted component.
             if (!mounted.current) return;
 
             setState(State.SigninInProgress);
-            const res = await completeU2FSignin(signResponse, redirectionURL);
+            const res = await completeU2FSignin(payload, redirectionURL);
             onSignInSuccessCallback(res ? res.redirect : undefined);
         } catch (err) {
             // If the request was initiated and the user changed 2FA method in the meantime,

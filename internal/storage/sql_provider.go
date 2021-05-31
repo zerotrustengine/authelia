@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -213,40 +212,27 @@ func (p *SQLProvider) DeleteTOTPSecret(username string) error {
 	return err
 }
 
-// SaveU2FDeviceHandle save a registered U2F device registration blob.
-func (p *SQLProvider) SaveU2FDeviceHandle(username string, keyHandle []byte, publicKey []byte) error {
+// SaveWebAuthnCredential save a registered U2F device registration blob.
+func (p *SQLProvider) SaveWebAuthnCredential(username string, credentialBlob string) error {
 	_, err := p.db.Exec(p.sqlUpsertU2FDeviceHandle,
 		username,
-		base64.StdEncoding.EncodeToString(keyHandle),
-		base64.StdEncoding.EncodeToString(publicKey))
+		credentialBlob)
 
 	return err
 }
 
-// LoadU2FDeviceHandle load a U2F device registration blob for a given username.
-func (p *SQLProvider) LoadU2FDeviceHandle(username string) ([]byte, []byte, error) {
-	var keyHandleBase64, publicKeyBase64 string
-	if err := p.db.QueryRow(p.sqlGetU2FDeviceHandleByUsername, username).Scan(&keyHandleBase64, &publicKeyBase64); err != nil {
+// LoadWebAuthnCredential load a U2F device registration blob for a given username.
+func (p *SQLProvider) LoadWebAuthnCredential(username string) (string, error) {
+	var credential string
+	if err := p.db.QueryRow(p.sqlGetU2FDeviceHandleByUsername, username).Scan(&credential); err != nil {
 		if err == sql.ErrNoRows {
-			return nil, nil, ErrNoU2FDeviceHandle
+			return "", ErrNoU2FDeviceHandle
 		}
 
-		return nil, nil, err
+		return "", err
 	}
 
-	keyHandle, err := base64.StdEncoding.DecodeString(keyHandleBase64)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	publicKey, err := base64.StdEncoding.DecodeString(publicKeyBase64)
-
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return keyHandle, publicKey, nil
+	return credential, nil
 }
 
 // AppendAuthenticationLog append a mark to the authentication log.
