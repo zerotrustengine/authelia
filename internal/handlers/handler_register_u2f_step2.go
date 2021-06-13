@@ -21,13 +21,13 @@ func SecondFactorU2FRegister(ctx *middlewares.AutheliaCtx) {
 
 	userSession := ctx.GetSession()
 
-	if userSession.U2FChallenge == nil {
+	if userSession.U2FSession.Challenge == nil {
 		ctx.Error(fmt.Errorf("U2F registration has not been initiated yet"), messageUnableToRegisterSecurityKey)
 		return
 	}
 	// Ensure the challenge is cleared if anything goes wrong.
 	defer func() {
-		userSession.U2FChallenge = nil
+		userSession.U2FSession.Challenge = nil
 
 		err := ctx.SaveSession(userSession)
 		if err != nil {
@@ -35,7 +35,7 @@ func SecondFactorU2FRegister(ctx *middlewares.AutheliaCtx) {
 		}
 	}()
 
-	registration, err := u2f.Register(responseBody, *userSession.U2FChallenge, u2fConfig)
+	registration, err := u2f.Register(responseBody, *userSession.U2FSession.Challenge, u2fConfig)
 
 	if err != nil {
 		ctx.Error(fmt.Errorf("Unable to verify U2F registration: %v", err), messageUnableToRegisterSecurityKey)

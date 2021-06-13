@@ -1,13 +1,12 @@
 package handlers
 
 import (
-	"crypto/elliptic"
 	"fmt"
 
-	"github.com/tstranex/u2f"
+	"github.com/duo-labs/webauthn/protocol"
+	"github.com/duo-labs/webauthn/webauthn"
 
 	"github.com/authelia/authelia/v4/internal/middlewares"
-	"github.com/authelia/authelia/v4/internal/session"
 	"github.com/authelia/authelia/v4/internal/storage"
 )
 
@@ -20,16 +19,6 @@ func SecondFactorU2FSignGet(ctx *middlewares.AutheliaCtx) {
 
 	if ctx.XForwardedHost() == nil {
 		ctx.Error(errMissingXForwardedHost, messageMFAValidationFailed)
-		return
-	}
-
-	appID := fmt.Sprintf("%s://%s", ctx.XForwardedProto(), ctx.XForwardedHost())
-
-	var trustedFacets = []string{appID}
-	challenge, err := u2f.NewChallenge(appID, trustedFacets)
-
-	if err != nil {
-		handleAuthenticationUnauthorized(ctx, fmt.Errorf("Unable to create U2F challenge: %s", err), messageMFAValidationFailed)
 		return
 	}
 
@@ -47,7 +36,7 @@ func SecondFactorU2FSignGet(ctx *middlewares.AutheliaCtx) {
 		return
 	}
 
-	var registration u2f.Registration
+	/*var registration u2f.Registration
 	registration.KeyHandle = keyHandleBytes
 	x, y := elliptic.Unmarshal(elliptic.P256(), publicKeyBytes)
 	registration.PubKey.Curve = elliptic.P256()
@@ -59,7 +48,32 @@ func SecondFactorU2FSignGet(ctx *middlewares.AutheliaCtx) {
 		KeyHandle: keyHandleBytes,
 		PublicKey: publicKeyBytes,
 	}
-	userSession.U2FChallenge = challenge
+	userSession.U2FChallenge = challenge*/
+
+	cred := webauthn.Credential{
+		ID:        keyHandleBytes,
+		PublicKey: publicKeyBytes,
+	}
+
+	/*cred, err := session.FromGOB64(credentialStr)
+	if err != nil {
+		handleAuthenticationUnauthorized(ctx, fmt.Errorf("Unable to deserialize webauthn credential: %s", err), mfaValidationFailedMessage)
+		return
+	}*/
+	userSession.AddCredential(&cred)
+
+	appID := fmt.Sprintf("%s://%s", ctx.XForwardedProto(), ctx.XForwardedHost())
+
+	options, sessionData, err := web.BeginLogin(&userSession,
+		webauthn.WithAssertionExtensions(protocol.AuthenticationExtensions{"appid": appID}))
+
+	if err != nil {
+		handleAuthenticationUnauthorized(ctx, fmt.Errorf("Unable to begin webauthn login: %s", err), messageMFAValidationFailed)
+		return
+	}
+
+	userSession.WebAuthnSession.SessionData = sessionData
+
 	err = ctx.SaveSession(userSession)
 
 	if err != nil {
@@ -67,8 +81,7 @@ func SecondFactorU2FSignGet(ctx *middlewares.AutheliaCtx) {
 		return
 	}
 
-	signRequest := challenge.SignRequest([]u2f.Registration{registration})
-	err = ctx.SetJSONBody(signRequest)
+	err = ctx.SetJSONBody(options)
 
 	if err != nil {
 		handleAuthenticationUnauthorized(ctx, fmt.Errorf("Unable to set sign request in body: %s", err), messageMFAValidationFailed)

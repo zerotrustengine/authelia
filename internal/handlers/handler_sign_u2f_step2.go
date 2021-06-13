@@ -2,13 +2,14 @@ package handlers
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/authelia/authelia/v4/internal/middlewares"
 )
 
 // SecondFactorU2FSignPost handler for completing a signing request.
-func SecondFactorU2FSignPost(u2fVerifier U2FVerifier) middlewares.RequestHandler {
-	return func(ctx *middlewares.AutheliaCtx) {
+func SecondFactorU2FSignPost(u2fVerifier U2FVerifier) middlewares.AutheliaHandlerFunc {
+	return func(ctx *middlewares.AutheliaCtx, rw http.ResponseWriter, req *http.Request) {
 		var requestBody signU2FRequestBody
 		err := ctx.ParseBody(&requestBody)
 
@@ -18,24 +19,16 @@ func SecondFactorU2FSignPost(u2fVerifier U2FVerifier) middlewares.RequestHandler
 		}
 
 		userSession := ctx.GetSession()
-		if userSession.U2FChallenge == nil {
-			handleAuthenticationUnauthorized(ctx, fmt.Errorf("U2F signing has not been initiated yet (no challenge)"), messageMFAValidationFailed)
+		if userSession.WebAuthnSession.SessionData == nil {
+			handleAuthenticationUnauthorized(ctx, fmt.Errorf("webauthn session data does not exist"), messageMFAValidationFailed)
 			return
 		}
 
-		if userSession.U2FRegistration == nil {
-			handleAuthenticationUnauthorized(ctx, fmt.Errorf("U2F signing has not been initiated yet (no registration)"), messageMFAValidationFailed)
-			return
-		}
-
-		err = u2fVerifier.Verify(
-			userSession.U2FRegistration.KeyHandle,
-			userSession.U2FRegistration.PublicKey,
-			requestBody.SignResponse,
-			*userSession.U2FChallenge)
+		_, err = web.FinishLogin(&userSession, *userSession.WebAuthnSession.SessionData, req)
 
 		if err != nil {
-			ctx.Error(err, messageMFAValidationFailed)
+			handleAuthenticationUnauthorized(ctx, fmt.Errorf("Unable to finish webauthn signing of user %s: %s",
+				userSession.Username, err), messageMFAValidationFailed)
 			return
 		}
 

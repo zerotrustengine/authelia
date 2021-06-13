@@ -24,8 +24,8 @@ func (s *HandlerSignU2FStep2Suite) SetupTest() {
 	s.mock = mocks.NewMockAutheliaCtx(s.T())
 	userSession := s.mock.Ctx.GetSession()
 	userSession.Username = testUsername
-	userSession.U2FChallenge = &u2f.Challenge{}
-	userSession.U2FRegistration = &session.U2FRegistration{}
+	userSession.U2FSession.Challenge = &u2f.Challenge{}
+	userSession.U2FSession.Registration = &session.U2FRegistration{}
 	err := s.mock.Ctx.SaveSession(userSession)
 	require.NoError(s.T(), err)
 }
@@ -49,7 +49,7 @@ func (s *HandlerSignU2FStep2Suite) TestShouldRedirectUserToDefaultURL() {
 	s.Require().NoError(err)
 	s.mock.Ctx.Request.SetBody(bodyBytes)
 
-	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx)
+	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx, nil, nil)
 	s.mock.Assert200OK(s.T(), redirectResponse{
 		Redirect: testRedirectionURL,
 	})
@@ -68,7 +68,7 @@ func (s *HandlerSignU2FStep2Suite) TestShouldNotReturnRedirectURL() {
 	s.Require().NoError(err)
 	s.mock.Ctx.Request.SetBody(bodyBytes)
 
-	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx)
+	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx, nil, nil)
 	s.mock.Assert200OK(s.T(), nil)
 }
 
@@ -86,7 +86,7 @@ func (s *HandlerSignU2FStep2Suite) TestShouldRedirectUserToSafeTargetURL() {
 	s.Require().NoError(err)
 	s.mock.Ctx.Request.SetBody(bodyBytes)
 
-	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx)
+	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx, nil, nil)
 	s.mock.Assert200OK(s.T(), redirectResponse{
 		Redirect: "https://mydomain.local",
 	})
@@ -106,7 +106,7 @@ func (s *HandlerSignU2FStep2Suite) TestShouldNotRedirectToUnsafeURL() {
 	s.Require().NoError(err)
 	s.mock.Ctx.Request.SetBody(bodyBytes)
 
-	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx)
+	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx, nil, nil)
 	s.mock.Assert200OK(s.T(), nil)
 }
 
@@ -126,7 +126,7 @@ func (s *HandlerSignU2FStep2Suite) TestShouldRegenerateSessionForPreventingSessi
 	r := regexp.MustCompile("^authelia_session=(.*); path=")
 	res := r.FindAllStringSubmatch(string(s.mock.Ctx.Response.Header.PeekCookie("authelia_session")), -1)
 
-	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx)
+	SecondFactorU2FSignPost(u2fVerifier)(s.mock.Ctx, nil, nil)
 	s.mock.Assert200OK(s.T(), nil)
 
 	s.Assert().NotEqual(

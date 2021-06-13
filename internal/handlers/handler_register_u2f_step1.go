@@ -48,7 +48,7 @@ func secondFactorU2FIdentityFinish(ctx *middlewares.AutheliaCtx, username string
 
 	// Save the challenge in the user session.
 	userSession := ctx.GetSession()
-	userSession.U2FChallenge = challenge
+	userSession.U2FSession.Challenge = challenge
 	err = ctx.SaveSession(userSession)
 
 	if err != nil {

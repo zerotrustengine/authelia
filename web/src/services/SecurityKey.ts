@@ -1,30 +1,18 @@
-import u2fApi from "u2f-api";
 
 import { InitiateU2FSignInPath, CompleteU2FSignInPath } from "@services/Api";
 import { Post, PostWithOptionalResponse } from "@services/Client";
 import { SignInResponse } from "@services/SignIn";
 
-interface InitiateU2FSigninResponse {
-    appId: string;
-    challenge: string;
-    registeredKeys: {
-        appId: string;
-        keyHandle: string;
-        version: string;
-    }[];
-}
-
 export async function initiateU2FSignin() {
-    return Post<InitiateU2FSigninResponse>(InitiateU2FSignInPath);
+    return Post<CredentialRequestOptions>(InitiateU2FSignInPath);
 }
 
-interface CompleteU2FSigninBody {
-    signResponse: u2fApi.SignResponse;
+interface CompleteWebAuthnSigninBody extends Credential {
     targetURL?: string;
 }
 
-export function completeU2FSignin(signResponse: u2fApi.SignResponse, targetURL: string | undefined) {
-    const body: CompleteU2FSigninBody = { signResponse };
+export function completeU2FSignin(credential: Credential, targetURL: string | undefined) {
+    const body: CompleteWebAuthnSigninBody = credential;
     if (targetURL) {
         body.targetURL = targetURL;
     }

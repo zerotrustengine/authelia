@@ -24,8 +24,8 @@ func (s *HandlerSignTOTPSuite) SetupTest() {
 	s.mock = mocks.NewMockAutheliaCtx(s.T())
 	userSession := s.mock.Ctx.GetSession()
 	userSession.Username = testUsername
-	userSession.U2FChallenge = &u2f.Challenge{}
-	userSession.U2FRegistration = &session.U2FRegistration{}
+	userSession.U2FSession.Challenge = &u2f.Challenge{}
+	userSession.U2FSession.Registration = &session.U2FRegistration{}
 	err := s.mock.Ctx.SaveSession(userSession)
 	require.NoError(s.T(), err)
 }

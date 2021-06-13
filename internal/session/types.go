@@ -3,6 +3,7 @@ package session
 import (
 	"time"
 
+	"github.com/duo-labs/webauthn/webauthn"
 	"github.com/fasthttp/session/v2"
 	"github.com/fasthttp/session/v2/providers/redis"
 	"github.com/tstranex/u2f"
@@ -19,10 +20,25 @@ type ProviderConfig struct {
 	providerName        string
 }
 
+// WebAuthnSession is the structure holding everything related to the webauthn session.
+type WebAuthnSession struct {
+	Credential  *webauthn.Credential
+	SessionData *webauthn.SessionData
+}
+
 // U2FRegistration is a serializable version of a U2F registration.
 type U2FRegistration struct {
 	KeyHandle []byte
 	PublicKey []byte
+}
+
+type U2FSession struct {
+	// The challenge generated in first step of U2F registration (after identity verification) or authentication.
+	// This is used reused in the second phase to check that the challenge has been completed.
+	Challenge *u2f.Challenge
+	// The registration representing a U2F device in DB set after identity verification.
+	// This is used in second phase of a U2F authentication.
+	Registration *U2FRegistration
 }
 
 // UserSession is the structure representing the session of a user.
@@ -40,12 +56,8 @@ type UserSession struct {
 	FirstFactorAuthnTimestamp  int64
 	SecondFactorAuthnTimestamp int64
 
-	// The challenge generated in first step of U2F registration (after identity verification) or authentication.
-	// This is used reused in the second phase to check that the challenge has been completed.
-	U2FChallenge *u2f.Challenge
-	// The registration representing a U2F device in DB set after identity verification.
-	// This is used in second phase of a U2F authentication.
-	U2FRegistration *U2FRegistration
+	U2FSession      U2FSession
+	WebAuthnSession WebAuthnSession
 
 	// Represent an OIDC workflow session initiated by the client if not null.
 	OIDCWorkflowSession *OIDCWorkflowSession
