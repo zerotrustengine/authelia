@@ -5,9 +5,11 @@ import (
 	"crypto"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/smtp"
+	"os"
 	"strings"
 	"time"
 
@@ -33,7 +35,7 @@ type SMTPNotifier struct {
 	startupCheckAddress string
 	client              *smtp.Client
 	tlsConfig           *tls.Config
-	signingPGPKey       *openpgp.Entity
+	signingPGPKeyring   openpgp.EntityList
 	signingPGPAlgorithm string
 }
 
@@ -61,10 +63,70 @@ func NewSMTPNotifier(configuration schema.SMTPNotifierConfiguration, certPool *x
 			notifier.signingPGPAlgorithm = rfc4880HashSymbolSHA256
 		}
 
-		notifier.signingPGPKey, _ = openpgp.ReadEntity(packet.NewReader(bytes.NewBufferString(configuration.PGP.Key)))
+		var err error
+
+		notifier.signingPGPKeyring, err = openpgp.ReadArmoredKeyRing(bytes.NewBufferString(configuration.PGP.Key))
+		if err != nil {
+			fmt.Printf("err loading pgp entitylist: %v\n", err)
+		}
+
+		printDebugInfo(notifier.signingPGPKeyring)
 	}
 
 	return notifier
+}
+
+func printDebugInfo(keyring openpgp.EntityList) {
+	fmt.Println("printing key information")
+	for _, entity := range keyring {
+		fmt.Println("======================")
+
+		fmt.Printf("fingerprint: %s\n", hex.EncodeToString(entity.PrivateKey.Fingerprint[:]))
+		for key, identity := range entity.Identities {
+
+			issuerKeyId := uint64(0)
+			if identity.SelfSignature.IssuerKeyId != nil {
+				issuerKeyId = *identity.SelfSignature.IssuerKeyId
+			}
+
+			isPrimaryKey := false
+			if identity.SelfSignature.IsPrimaryId != nil {
+				isPrimaryKey = *identity.SelfSignature.IsPrimaryId
+			}
+
+			fmt.Println("----------------------")
+			fmt.Printf("key: %s, name: %s\n", key, identity.Name)
+			fmt.Printf("user | id: %s, name: %s, email: %s, comment: %s\n", identity.UserId.Id, identity.UserId.Name, identity.UserId.Email, identity.UserId.Comment)
+			fmt.Printf("self | hash: %s, hash suffix: %s, created: %v, sig lifetime: %v, key lifetime: %v, expired: %v, type: %v\n", identity.SelfSignature.Hash.String(), hex.EncodeToString(identity.SelfSignature.HashSuffix), identity.SelfSignature.CreationTime, identity.SelfSignature.SigLifetimeSecs, identity.SelfSignature.KeyLifetimeSecs, identity.SelfSignature.KeyExpired(time.Now()), identity.SelfSignature.SigType)
+			fmt.Printf("self | algo: %v, issuer id: %d, compression: %d, hash %d, symetric: %v\n", identity.SelfSignature.PubKeyAlgo, issuerKeyId, identity.SelfSignature.PreferredCompression, identity.SelfSignature.PreferredCompression, identity.SelfSignature.PreferredSymmetric)
+			fmt.Printf("self | primary: %v, sign: %v, certify: %v, encrypt storage: %v, encrypt communications: %v, mdc: %v, valid: %v\n", isPrimaryKey, identity.SelfSignature.FlagSign, identity.SelfSignature.FlagCertify, identity.SelfSignature.FlagEncryptStorage, identity.SelfSignature.FlagEncryptCommunications, identity.SelfSignature.MDC, identity.SelfSignature.FlagsValid)
+			fmt.Printf("self | rsa signature: %v\n", identity.SelfSignature.RSASignature)
+			if len(identity.Signatures) != 0 {
+				fmt.Println("**********************\nother signatures:")
+				for i, signature := range identity.Signatures {
+					fmt.Printf("%d | hash: %s, hash suffix: %s, created: %v, sig lifetime: %v, key lifetime: %v, expired: %v, type: %v\n", i, signature.Hash.String(), hex.EncodeToString(signature.HashSuffix), signature.CreationTime, signature.SigLifetimeSecs, signature.KeyLifetimeSecs, signature.KeyExpired(time.Now()), signature.SigType)
+					fmt.Printf("%d |  sign: %v, certify: %v, encrypt storage: %v, encrypt communications: %v, mdc: %v, valid: %v\n", i, signature.FlagSign, signature.FlagCertify, signature.FlagEncryptStorage, signature.FlagEncryptCommunications, signature.MDC, signature.FlagsValid)
+				}
+				fmt.Println("**********************")
+			}
+			fmt.Println("----------------------")
+		}
+		fmt.Println("======================")
+	}
+}
+
+func writeDebugFile(header, signedContent string) {
+	out := os.Getenv("TEST_SMTP_OUTPUT_FILE")
+	if out != "" {
+		outfile := fmt.Sprintf("%s_%s.txt", out, time.Now().Format(rfc5322DateTimeLayout))
+		err := os.WriteFile(outfile, []byte(header+signedContent), 0600)
+
+		if err != nil {
+			fmt.Printf("err writing test file %s: %v\n", outfile, err)
+		} else {
+			fmt.Printf("test file written to %s\n", outfile)
+		}
+	}
 }
 
 // Do startTLS if available (some servers only provide the auth extension after, and encryption is preferred).
@@ -170,33 +232,33 @@ func (n *SMTPNotifier) compose(recipient, subject, body, htmlBody string) error 
 
 	now := time.Now()
 
-	header := "Date:" + now.Format(rfc5322DateTimeLayout) + rfc2822NewLine +
-		"From: " + n.sender + rfc2822NewLine +
-		"To: " + recipient + rfc2822NewLine +
-		"Subject: " + subject + rfc2822NewLine
+	header := "Date: " + now.Format(rfc5322DateTimeLayout) + crlf +
+		"From: " + n.sender + crlf +
+		"To: " + recipient + crlf +
+		"Subject: " + subject + crlf
 
-	signableContent := "Content-Type: multipart/alternative; boundary=" + boundary + rfc2822NewLine +
-		"Content-Transfer-Encoding: 7bit" + rfc2822DoubleNewLine +
-		"--" + boundary + rfc2822NewLine +
-		"Content-Type: text/plain; charset=\"UTF-8\"" + rfc2822NewLine +
-		"Content-Transfer-Encoding: quoted-printable" + rfc2822NewLine +
-		"Content-Disposition: inline" + rfc2822DoubleNewLine +
-		body + rfc2822DoubleNewLine
+	signableContent := "--" + boundary + crlf +
+		"Content-Type: text/plain; charset=\"utf-8\"" + crlf +
+		"Content-Transfer-Encoding: quoted-printable" + crlf +
+		"Content-Disposition: inline" + crlf +
+		body + crlf
 
 	if htmlBody != "" {
-		signableContent += "--" + boundary + rfc2822NewLine +
-			"Content-Type: text/html; charset=\"UTF-8\"" + rfc2822NewLine +
-			"Content-Transfer-Encoding: quoted-printable" + rfc2822DoubleNewLine +
-			htmlBody + rfc2822DoubleNewLine
+		signableContent += "--" + boundary + crlf +
+			"Content-Type: text/html; charset=\"UTF-8\"" + crlf +
+			"Content-Transfer-Encoding: quoted-printable" + crlf +
+			htmlBody + crlf
 	}
 
 	signableContent += "--" + boundary + "--"
 
-	signedContent, err := n.packAndSignContent(signableContent)
+	signedContent, err := n.packAndSignContent(signableContent, boundary)
 	if err != nil {
 		logger.Debugf("Notifier SMTP client error while packing and signing email content: %v", err)
 		return err
 	}
+
+	writeDebugFile(header, signedContent)
 
 	_, err = fmt.Fprint(wc, header+signedContent)
 	if err != nil {
@@ -213,22 +275,32 @@ func (n *SMTPNotifier) compose(recipient, subject, body, htmlBody string) error 
 	return nil
 }
 
-func (n *SMTPNotifier) packAndSignContent(content string) (signedContent string, err error) {
+func (n *SMTPNotifier) packAndSignContent(content, contentBoundary string) (signedContent string, err error) {
 	content = reEOLWhitespace.ReplaceAllString(content, "\r\n")
+	content = reNonRFC2822Newlines.ReplaceAllString(content, "$1\r\n")
+	contentTypeMultiPartAlternative := fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"", contentBoundary) + crlf
 
-	if n.signingPGPKey == nil {
-		return rfc2822MIMEHeader + content, nil
+	var key *openpgp.Entity
+
+	for _, entity := range n.signingPGPKeyring {
+		if entity.PrivateKey.CanSign() {
+			key = entity
+			break
+		}
 	}
+
+	if len(n.signingPGPKeyring) == 0 || key == nil {
+		return contentTypeMultiPartAlternative + rfc2822MIMEHeader + content, nil
+	}
+
+	content = contentTypeMultiPartAlternative + crlf + content
 
 	boundary := utils.RandomString(30, utils.AlphaNumericCharacters)
 
-	signedContent = "Content-Type: multipart/signed; micalg=" + n.signingPGPAlgorithm + "; protocol=\"application/pgp-signature\"; boundary=" + boundary + rfc2822NewLine +
-		rfc2822MIMEHeader +
-		"--" + boundary + rfc2822NewLine
-
-	var signature strings.Builder
-
-	var config *packet.Config
+	var (
+		config    *packet.Config
+		signature strings.Builder
+	)
 
 	switch n.signingPGPAlgorithm {
 	case rfc4880HashSymbolSHA512:
@@ -241,16 +313,21 @@ func (n *SMTPNotifier) packAndSignContent(content string) (signedContent string,
 		config = &packet.Config{DefaultHash: crypto.SHA1}
 	}
 
-	err = openpgp.ArmoredDetachSignText(&signature, n.signingPGPKey, strings.NewReader(content), config)
+	err = openpgp.ArmoredDetachSignText(&signature, key, strings.NewReader(content), config)
 	if err != nil {
 		return rfc2822MIMEHeader + content, err
 	}
 
-	signedContent += "Content-Type: application/pgp-signature; name=signature.asc" + rfc2822NewLine +
-		"Content-Disposition: attachment; filename=signature.asc" + rfc2822NewLine +
-		"Content-Description: OpenPGP digital signature" + rfc2822DoubleNewLine +
-		signature.String() + rfc2822DoubleNewLine +
-		"--" + boundary + "--" + rfc2822NewLine
+	signedContent = fmt.Sprintf("Content-Type: multipart/signed; micalg=\"%s\"; protocol=\"application/pgp-signature\"; boundary=\"%s\"", n.signingPGPAlgorithm, boundary) + crlf +
+		rfc2822MIMEHeader +
+		"--" + boundary + crlf +
+		content + doubleCRLF +
+		"--" + boundary + crlf +
+		"Content-Type: application/pgp-signature; name=\"signature.asc\"" + crlf +
+		"Content-Disposition: attachment; filename=\"signature.asc\"" + crlf +
+		"Content-Description: OpenPGP digital signature" + doubleCRLF +
+		signature.String() + doubleCRLF +
+		"--" + boundary + "--"
 
 	return signedContent, nil
 }

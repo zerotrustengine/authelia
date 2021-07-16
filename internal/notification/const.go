@@ -6,9 +6,9 @@ const fileNotifierMode = 0600
 const rfc5322DateTimeLayout = "Mon, 2 Jan 2006 15:04:05 -0700"
 
 const (
-	rfc2822NewLine       = "\r\n"
-	rfc2822DoubleNewLine = rfc2822NewLine + rfc2822NewLine
-	rfc2822MIMEHeader    = "MIME-Version: 1.0" + rfc2822DoubleNewLine
+	crlf              = "\r\n"
+	doubleCRLF        = crlf + crlf
+	rfc2822MIMEHeader = "MIME-Version: 1.0" + doubleCRLF + "This is a message in Mime Format. If you see this, your mail reader does not support this format." + doubleCRLF
 )
 
 const (
@@ -19,5 +19,6 @@ const (
 )
 
 var (
-	reEOLWhitespace = regexp.MustCompile(`[ \t]+(\r\n|\n|\r|\f)`)
+	reEOLWhitespace      = regexp.MustCompile(`[ \t]+(\r\n|\n|\r|\f)`)
+	reNonRFC2822Newlines = regexp.MustCompile(`([^\r])\n`)
 )
