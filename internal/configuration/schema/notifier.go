@@ -7,17 +7,24 @@ type FileSystemNotifierConfiguration struct {
 
 // SMTPNotifierConfiguration represents the configuration of the SMTP server to send emails with.
 type SMTPNotifierConfiguration struct {
-	Host                string     `mapstructure:"host"`
-	Port                int        `mapstructure:"port"`
-	Username            string     `mapstructure:"username"`
-	Password            string     `mapstructure:"password"`
-	Identifier          string     `mapstructure:"identifier"`
-	Sender              string     `mapstructure:"sender"`
-	Subject             string     `mapstructure:"subject"`
-	StartupCheckAddress string     `mapstructure:"startup_check_address"`
-	DisableRequireTLS   bool       `mapstructure:"disable_require_tls"`
-	DisableHTMLEmails   bool       `mapstructure:"disable_html_emails"`
-	TLS                 *TLSConfig `mapstructure:"tls"`
+	Host                string            `mapstructure:"host"`
+	Port                int               `mapstructure:"port"`
+	Username            string            `mapstructure:"username"`
+	Password            string            `mapstructure:"password"`
+	Identifier          string            `mapstructure:"identifier"`
+	Sender              string            `mapstructure:"sender"`
+	Subject             string            `mapstructure:"subject"`
+	StartupCheckAddress string            `mapstructure:"startup_check_address"`
+	DisableRequireTLS   bool              `mapstructure:"disable_require_tls"`
+	DisableHTMLEmails   bool              `mapstructure:"disable_html_emails"`
+	TLS                 *TLSConfig        `mapstructure:"tls"`
+	PGP                 *PGPConfiguration `mapstructure:"pgp"`
+}
+
+// PGPConfiguration represents a PGP configuration.
+type PGPConfiguration struct {
+	Key       string `mapstructure:"key"`
+	Algorithm string `mapstructure:"algorithm"`
 }
 
 // NotifierConfiguration represents the configuration of the notifier to use when sending notifications to users.

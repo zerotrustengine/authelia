@@ -1,6 +1,8 @@
 package notification
 
 import (
+	"bytes"
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -8,6 +10,9 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/openpgp"
+	"golang.org/x/crypto/openpgp/packet"
 
 	"github.com/authelia/authelia/internal/configuration/schema"
 	"github.com/authelia/authelia/internal/logging"
@@ -28,6 +33,8 @@ type SMTPNotifier struct {
 	startupCheckAddress string
 	client              *smtp.Client
 	tlsConfig           *tls.Config
+	signingPGPKey       *openpgp.Entity
+	signingPGPAlgorithm string
 }
 
 // NewSMTPNotifier creates a SMTPNotifier using the notifier configuration.
@@ -44,6 +51,17 @@ func NewSMTPNotifier(configuration schema.SMTPNotifierConfiguration, certPool *x
 		subject:             configuration.Subject,
 		startupCheckAddress: configuration.StartupCheckAddress,
 		tlsConfig:           utils.NewTLSConfig(configuration.TLS, tls.VersionTLS12, certPool),
+	}
+
+	if configuration.PGP != nil {
+		switch configuration.PGP.Algorithm {
+		case rfc4880HashSymbolSHA512, rfc4880HashSymbolSHA384, rfc4880HashSymbolSHA256, rfc4880HashSymbolSHA1:
+			notifier.signingPGPAlgorithm = configuration.PGP.Algorithm
+		default:
+			notifier.signingPGPAlgorithm = rfc4880HashSymbolSHA256
+		}
+
+		notifier.signingPGPKey, _ = openpgp.ReadEntity(packet.NewReader(bytes.NewBufferString(configuration.PGP.Key)))
 	}
 
 	return notifier
@@ -152,29 +170,37 @@ func (n *SMTPNotifier) compose(recipient, subject, body, htmlBody string) error 
 
 	now := time.Now()
 
-	msg := "Date:" + now.Format(rfc5322DateTimeLayout) + "\n" +
-		"From: " + n.sender + "\n" +
-		"To: " + recipient + "\n" +
-		"Subject: " + subject + "\n" +
-		"MIME-version: 1.0\n" +
-		"Content-Type: multipart/alternative; boundary=" + boundary + "\n\n" +
-		"--" + boundary + "\n" +
-		"Content-Type: text/plain; charset=\"UTF-8\"\n" +
-		"Content-Transfer-Encoding: quoted-printable\n" +
-		"Content-Disposition: inline\n\n" +
-		body + "\n"
+	header := "Date:" + now.Format(rfc5322DateTimeLayout) + rfc2822NewLine +
+		"From: " + n.sender + rfc2822NewLine +
+		"To: " + recipient + rfc2822NewLine +
+		"Subject: " + subject + rfc2822NewLine
+
+	signableContent := "Content-Type: multipart/alternative; boundary=" + boundary + rfc2822NewLine +
+		"Content-Transfer-Encoding: 7bit" + rfc2822DoubleNewLine +
+		"--" + boundary + rfc2822NewLine +
+		"Content-Type: text/plain; charset=\"UTF-8\"" + rfc2822NewLine +
+		"Content-Transfer-Encoding: quoted-printable" + rfc2822NewLine +
+		"Content-Disposition: inline" + rfc2822DoubleNewLine +
+		body + rfc2822DoubleNewLine
 
 	if htmlBody != "" {
-		msg += "--" + boundary + "\n" +
-			"Content-Type: text/html; charset=\"UTF-8\"\n\n" +
-			htmlBody + "\n"
+		signableContent += "--" + boundary + rfc2822NewLine +
+			"Content-Type: text/html; charset=\"UTF-8\"" + rfc2822NewLine +
+			"Content-Transfer-Encoding: quoted-printable" + rfc2822DoubleNewLine +
+			htmlBody + rfc2822DoubleNewLine
 	}
 
-	msg += "--" + boundary + "--"
+	signableContent += "--" + boundary + "--"
 
-	_, err = fmt.Fprint(wc, msg)
+	signedContent, err := n.packAndSignContent(signableContent)
 	if err != nil {
-		logger.Debugf("Notifier SMTP client error while sending email body over WriteCloser: %s", err)
+		logger.Debugf("Notifier SMTP client error while packing and signing email content: %v", err)
+		return err
+	}
+
+	_, err = fmt.Fprint(wc, header+signedContent)
+	if err != nil {
+		logger.Debugf("Notifier SMTP client error while sending email body over WriteCloser: %v", err)
 		return err
 	}
 
@@ -185,6 +211,48 @@ func (n *SMTPNotifier) compose(recipient, subject, body, htmlBody string) error 
 	}
 
 	return nil
+}
+
+func (n *SMTPNotifier) packAndSignContent(content string) (signedContent string, err error) {
+	content = reEOLWhitespace.ReplaceAllString(content, "\r\n")
+
+	if n.signingPGPKey == nil {
+		return rfc2822MIMEHeader + content, nil
+	}
+
+	boundary := utils.RandomString(30, utils.AlphaNumericCharacters)
+
+	signedContent = "Content-Type: multipart/signed; micalg=" + n.signingPGPAlgorithm + "; protocol=\"application/pgp-signature\"; boundary=" + boundary + rfc2822NewLine +
+		rfc2822MIMEHeader +
+		"--" + boundary + rfc2822NewLine
+
+	var signature strings.Builder
+
+	var config *packet.Config
+
+	switch n.signingPGPAlgorithm {
+	case rfc4880HashSymbolSHA512:
+		config = &packet.Config{DefaultHash: crypto.SHA512}
+	case rfc4880HashSymbolSHA384:
+		config = &packet.Config{DefaultHash: crypto.SHA384}
+	case rfc4880HashSymbolSHA256:
+		config = &packet.Config{DefaultHash: crypto.SHA256}
+	case rfc4880HashSymbolSHA1:
+		config = &packet.Config{DefaultHash: crypto.SHA1}
+	}
+
+	err = openpgp.ArmoredDetachSignText(&signature, n.signingPGPKey, strings.NewReader(content), config)
+	if err != nil {
+		return rfc2822MIMEHeader + content, err
+	}
+
+	signedContent += "Content-Type: application/pgp-signature; name=signature.asc" + rfc2822NewLine +
+		"Content-Disposition: attachment; filename=signature.asc" + rfc2822NewLine +
+		"Content-Description: OpenPGP digital signature" + rfc2822DoubleNewLine +
+		signature.String() + rfc2822DoubleNewLine +
+		"--" + boundary + "--" + rfc2822NewLine
+
+	return signedContent, nil
 }
 
 // Dial the SMTP server with the SMTPNotifier config.

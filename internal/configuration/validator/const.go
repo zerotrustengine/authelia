@@ -201,6 +201,8 @@ var validKeys = []string{
 	"notifier.smtp.tls.minimum_version",
 	"notifier.smtp.tls.skip_verify",
 	"notifier.smtp.tls.server_name",
+	"notifier.smtp.pgp.key",
+	"notifier.smtp.pgp.algorithm",
 
 	// Regulation Keys.
 	"regulation.max_retries",
