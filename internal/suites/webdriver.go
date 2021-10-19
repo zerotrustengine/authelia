@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/tebeka/selenium"
@@ -22,6 +24,44 @@ import (
 type WebDriverSession struct {
 	service   *selenium.Service
 	WebDriver selenium.WebDriver
+}
+
+// RodSession binding a chrome session with devtool protocol.
+type RodSession struct {
+	Launcher  *launcher.Launcher
+	WebDriver *rod.Browser
+}
+
+// StartRodWithProxy create a chrome session.
+func StartRodWithProxy(proxy string) (*RodSession, error) {
+	headless := false
+	trace := true
+	motion := 250 * time.Millisecond
+
+	if os.Getenv("HEADLESS") != "" {
+		headless = true
+		trace = false
+		motion = 0 * time.Second
+	}
+
+	l := launcher.New().
+		Proxy(proxy).
+		Headless(headless).
+		Devtools(true)
+	url := l.MustLaunch()
+
+	browser := rod.New().
+		ControlURL(url).
+		Trace(trace).
+		SlowMotion(motion).
+		MustConnect()
+
+	browser.MustIgnoreCertErrors(true)
+
+	return &RodSession{
+		Launcher:  l,
+		WebDriver: browser,
+	}, nil
 }
 
 // StartWebDriverWithProxy create a selenium session.
@@ -71,6 +111,11 @@ func StartWebDriverWithProxy(proxy string, port int) (*WebDriverSession, error) 
 		service:   service,
 		WebDriver: wd,
 	}, nil
+}
+
+// StartRod create a chrome session.
+func StartRod() (*RodSession, error) {
+	return StartRodWithProxy("")
 }
 
 // StartWebDriver create a selenium session.
@@ -192,6 +237,15 @@ func (wds *WebDriverSession) waitElementsLocated(ctx context.Context, t *testing
 	return el
 }
 
+// WaitElementLocatedByID wait until an element is located by id.
+func (rs *RodSession) WaitElementLocatedByID(t *testing.T, page *rod.Page, id string) *rod.Element {
+	e, err := page.Element(id)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	return e
+}
+
 // WaitElementLocatedByID wait an element is located by id.
 func (wds *WebDriverSession) WaitElementLocatedByID(ctx context.Context, t *testing.T, id string) selenium.WebElement {
 	return wds.waitElementLocated(ctx, t, selenium.ByID, id)
@@ -200,6 +254,15 @@ func (wds *WebDriverSession) WaitElementLocatedByID(ctx context.Context, t *test
 // WaitElementLocatedByTagName wait an element is located by tag name.
 func (wds *WebDriverSession) WaitElementLocatedByTagName(ctx context.Context, t *testing.T, tagName string) selenium.WebElement {
 	return wds.waitElementLocated(ctx, t, selenium.ByTagName, tagName)
+}
+
+// WaitElementLocatedByClassName wait an element is located by class name.
+func (rs *RodSession) WaitElementLocatedByClassName(t *testing.T, page *rod.Page, className string) *rod.Element {
+	e, err := page.Element("." + className)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	return e
 }
 
 // WaitElementLocatedByClassName wait an element is located by class name.
@@ -213,13 +276,38 @@ func (wds *WebDriverSession) WaitElementLocatedByLinkText(ctx context.Context, t
 }
 
 // WaitElementLocatedByCSSSelector wait an element is located by class name.
+func (rs *RodSession) WaitElementLocatedByCSSSelector(t *testing.T, page *rod.Page, cssSelector string) *rod.Element {
+	e, err := page.Element("#" + cssSelector)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	return e
+}
+
+// WaitElementLocatedByCSSSelector wait an element is located by class name.
 func (wds *WebDriverSession) WaitElementLocatedByCSSSelector(ctx context.Context, t *testing.T, cssSelector string) selenium.WebElement {
 	return wds.waitElementLocated(ctx, t, selenium.ByCSSSelector, cssSelector)
 }
 
 // WaitElementsLocatedByCSSSelector wait an element is located by CSS selector.
+func (rs *RodSession) WaitElementsLocatedByCSSSelector(t *testing.T, page *rod.Page, cssSelector string) rod.Elements {
+	e, err := page.Elements("#" + cssSelector)
+	require.NoError(t, err)
+	require.NotNil(t, e)
+
+	return e
+}
+
+// WaitElementsLocatedByCSSSelector wait an element is located by CSS selector.
 func (wds *WebDriverSession) WaitElementsLocatedByCSSSelector(ctx context.Context, t *testing.T, cssSelector string) []selenium.WebElement {
 	return wds.waitElementsLocated(ctx, t, selenium.ByCSSSelector, cssSelector)
+}
+
+// WaitElementTextContains wait the text of an element contains a pattern.
+func (rs *RodSession) WaitElementTextContains(t *testing.T, page *rod.Page, element *rod.Element, pattern string) {
+	text, err := element.Text()
+	require.NoError(t, err)
+	require.NotNil(t, text)
 }
 
 // WaitElementTextContains wait the text of an element contains a pattern.
