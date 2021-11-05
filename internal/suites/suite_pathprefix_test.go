@@ -20,5 +20,4 @@ func TestPathPrefixSuite(t *testing.T) {
 	TestRunOneFactorScenario(t)
 	TestRunTwoFactorScenario(t)
 	TestRunCustomHeadersScenario(t)
-	TestRunResetPasswordScenario(t)
 }

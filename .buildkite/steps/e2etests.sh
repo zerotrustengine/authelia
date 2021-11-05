@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -eu
 
+PARALLEL=""
+
 for SUITE_NAME in $(authelia-scripts suites list); do
+if [[ "${SUITE_NAME}" =~ ^(HighAvailability|Standalone)$ ]]; then
+  PARALLEL=" --parallel 5"
+fi
 cat << EOF
   - label: ":selenium: ${SUITE_NAME} Suite"
-    command: "authelia-scripts --log-level debug suites test ${SUITE_NAME} --headless"
+    command: "authelia-scripts --log-level debug suites test ${SUITE_NAME}${PARALLEL} --headless"
     retry:
       automatic: true
 EOF
@@ -33,9 +38,9 @@ cat << EOF
     agents:
       suite: "all"
 EOF
+fi
 cat << EOF
     env:
       SUITE: "${SUITE_NAME}"
 EOF
-fi
 done

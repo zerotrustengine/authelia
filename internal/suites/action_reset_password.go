@@ -9,8 +9,10 @@ import (
 
 func (rs *RodSession) doInitiatePasswordReset(t *testing.T, page *rod.Page, username string) {
 	rs.WaitElementLocatedByCSSSelector(t, page, "reset-password-button").MustClick()
+
 	// Fill in username
 	rs.WaitElementLocatedByCSSSelector(t, page, "username-textfield").MustInput(username)
+
 	// And click on the reset button
 	rs.WaitElementLocatedByCSSSelector(t, page, "reset-button").MustClick()
 }

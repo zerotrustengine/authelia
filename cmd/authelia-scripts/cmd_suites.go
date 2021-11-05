@@ -33,7 +33,7 @@ var testPattern string
 
 func init() {
 	SuitesTestCmd.Flags().BoolVar(&headless, "headless", false, "Run tests in headless mode")
-	SuitesTestCmd.Flags().IntVar(&parallel, "parallel", 0, "Run tests in parallel with n jobs")
+	SuitesTestCmd.Flags().IntVar(&parallel, "parallel", 1, "Run tests in parallel with n jobs")
 	SuitesTestCmd.Flags().StringVar(&testPattern, "test", "", "The single test to run")
 }
 
@@ -282,11 +282,7 @@ func runSuiteTests(suiteName string, withEnv bool) error {
 		timeout = fmt.Sprintf("%ds", int64(suite.TestTimeout/time.Second))
 	}
 
-	testCmdLine := fmt.Sprintf("go test -count=1 -v ./internal/suites -timeout %s ", timeout)
-
-	if parallel > 0 {
-		testCmdLine += fmt.Sprintf("-parallel=%v ", parallel)
-	}
+	testCmdLine := fmt.Sprintf("go test -count=1 -v ./internal/suites -timeout %s -parallel=%v ", timeout, parallel)
 
 	if testPattern != "" {
 		testCmdLine += fmt.Sprintf("-run '%s'", testPattern)
