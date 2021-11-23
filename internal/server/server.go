@@ -76,6 +76,15 @@ func registerRoutes(configuration schema.Configuration, providers middlewares.Pr
 			handlers.ResetPasswordIdentityFinish))
 		r.POST("/api/reset-password", autheliaMiddleware(
 			handlers.ResetPasswordPost))
+
+		r.GET("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusFound)))
+		r.HEAD("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusFound)))
+		r.POST("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
+		r.PUT("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
+		r.CONNECT("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
+		r.DELETE("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
+		r.PATCH("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
+		r.OPTIONS("/.well-known/change-password", autheliaMiddleware(handlers.WellKnownChangePassword(fasthttp.StatusSeeOther)))
 	}
 
 	// Information about the user.
