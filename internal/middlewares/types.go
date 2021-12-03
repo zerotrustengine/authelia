@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 
@@ -26,6 +27,8 @@ type AutheliaCtx struct {
 	Configuration schema.Configuration
 
 	Clock utils.Clock
+
+	TraceUUID uuid.UUID
 }
 
 // Providers contain all provider provided to Authelia.

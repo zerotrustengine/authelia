@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/asaskevich/govalidator"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/valyala/fasthttp"
 
@@ -20,15 +21,18 @@ import (
 // NewRequestLogger create a new request logger for the given request.
 func NewRequestLogger(ctx *AutheliaCtx) *logrus.Entry {
 	return logrus.WithFields(logrus.Fields{
-		"method":    string(ctx.Method()),
-		"path":      string(ctx.Path()),
-		"remote_ip": ctx.RemoteIP().String(),
+		"method":       string(ctx.Method()),
+		"path":         string(ctx.Path()),
+		"remote_ip":    ctx.RemoteIP().String(),
+		"request_uuid": ctx.TraceUUID.String(),
 	})
 }
 
 // NewAutheliaCtx instantiate an AutheliaCtx out of a RequestCtx.
 func NewAutheliaCtx(ctx *fasthttp.RequestCtx, configuration schema.Configuration, providers Providers) (*AutheliaCtx, error) {
 	autheliaCtx := new(AutheliaCtx)
+	autheliaCtx.TraceUUID = uuid.New()
+
 	autheliaCtx.RequestCtx = ctx
 	autheliaCtx.Providers = providers
 	autheliaCtx.Configuration = configuration
