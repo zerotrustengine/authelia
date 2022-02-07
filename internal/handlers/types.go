@@ -15,6 +15,7 @@ type authorizationMatching int
 type configurationBody struct {
 	AvailableMethods    MethodList `json:"available_methods"`
 	SecondFactorEnabled bool       `json:"second_factor_enabled"` // whether second factor is enabled or not.
+	Default2FAMethod    string     `json:"default_2fa_method,omitempty"`
 }
 
 // signTOTPRequestBody model of the request body received by TOTP authentication endpoint.

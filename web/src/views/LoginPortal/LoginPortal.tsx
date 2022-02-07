@@ -1,6 +1,6 @@
-import React, { Fragment, ReactNode, useCallback, useEffect, useState } from "react";
+import React, {Fragment, ReactNode, useCallback, useEffect, useState} from "react";
 
-import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import {Route, Routes, useLocation, useNavigate} from "react-router-dom";
 
 import {
     AuthenticatedRoute,
@@ -10,16 +10,16 @@ import {
     SecondFactorTOTPSubRoute,
     SecondFactorU2FSubRoute,
 } from "@constants/Routes";
-import { useConfiguration } from "@hooks/Configuration";
-import { useNotifications } from "@hooks/NotificationsContext";
-import { useRedirectionURL } from "@hooks/RedirectionURL";
-import { useRedirector } from "@hooks/Redirector";
-import { useRequestMethod } from "@hooks/RequestMethod";
-import { useAutheliaState } from "@hooks/State";
-import { useUserInfo } from "@hooks/UserInfo";
-import { SecondFactorMethod } from "@models/Methods";
-import { checkSafeRedirection } from "@services/SafeRedirection";
-import { AuthenticationLevel } from "@services/State";
+import {useConfiguration} from "@hooks/Configuration";
+import {useNotifications} from "@hooks/NotificationsContext";
+import {useRedirectionURL} from "@hooks/RedirectionURL";
+import {useRedirector} from "@hooks/Redirector";
+import {useRequestMethod} from "@hooks/RequestMethod";
+import {useAutheliaState} from "@hooks/State";
+import {useUserInfo} from "@hooks/UserInfo";
+import {SecondFactorMethod} from "@models/Methods";
+import {checkSafeRedirection} from "@services/SafeRedirection";
+import {AuthenticationLevel} from "@services/State";
 import LoadingPage from "@views/LoadingPage/LoadingPage";
 import AuthenticatedView from "@views/LoginPortal/AuthenticatedView/AuthenticatedView";
 import FirstFactorForm from "@views/LoginPortal/FirstFactor/FirstFactorForm";
@@ -128,9 +128,9 @@ const LoginPortal = function (props: Props) {
                 if (!configuration.second_factor_enabled) {
                     redirect(AuthenticatedRoute);
                 } else {
-                    if (userInfo.method === SecondFactorMethod.U2F) {
+                    if (userInfo.method === SecondFactorMethod.U2F || configuration.default_2fa_method === SecondFactorMethod.U2F) {
                         redirect(`${SecondFactorRoute}${SecondFactorU2FSubRoute}${redirectionSuffix}`);
-                    } else if (userInfo.method === SecondFactorMethod.MobilePush) {
+                    } else if (userInfo.method === SecondFactorMethod.MobilePush || configuration.default_2fa_method === SecondFactorMethod.MobilePush) {
                         redirect(`${SecondFactorRoute}${SecondFactorPushSubRoute}${redirectionSuffix}`);
                     } else {
                         redirect(`${SecondFactorRoute}${SecondFactorTOTPSubRoute}${redirectionSuffix}`);

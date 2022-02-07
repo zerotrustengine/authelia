@@ -3,7 +3,9 @@ package validator
 import (
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/authelia/authelia/v4/internal/authentication"
 	"github.com/authelia/authelia/v4/internal/configuration/schema"
 	"github.com/authelia/authelia/v4/internal/utils"
 )
@@ -28,6 +30,10 @@ func ValidateConfiguration(configuration *schema.Configuration, validator *schem
 		if err != nil {
 			validator.Push(fmt.Errorf("Value for \"default_redirection_url\" is invalid: %+v", err))
 		}
+	}
+
+	if configuration.Default2FAMethod != "" && !utils.IsStringInSlice(configuration.Default2FAMethod, authentication.PossibleMethods) {
+		validator.Push(fmt.Errorf("Value for \"default_2fa_method\" must be one of: %s", strings.Join(authentication.PossibleMethods, ",")))
 	}
 
 	ValidateTheme(configuration, validator)

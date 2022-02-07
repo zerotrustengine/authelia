@@ -157,3 +157,17 @@ func TestShouldNotRaiseErrorOnValidCertificatesDirectory(t *testing.T) {
 
 	assert.EqualError(t, validator.Warnings()[0], "No access control rules have been defined so the default policy two_factor will be applied to all requests")
 }
+
+func TestShouldRaiseErrorWhenDefault2FAMethodIsUnknown(t *testing.T) {
+	validator := schema.NewStructValidator()
+	config := newDefaultConfig()
+	config.Default2FAMethod = "unknown"
+
+	ValidateConfiguration(&config, validator)
+
+	require.Len(t, validator.Errors(), 1)
+	require.Len(t, validator.Warnings(), 1)
+
+	require.EqualError(t, validator.Errors()[0], "Value for \"default_2fa_method\" must be one of: totp,u2f,mobile_push")
+	assert.EqualError(t, validator.Warnings()[0], "No access control rules have been defined so the default policy two_factor will be applied to all requests")
+}

@@ -131,6 +131,22 @@ func (s *SecondFactorAvailableMethodsFixture) TestShouldCheckSecondFactorIsEnabl
 	})
 }
 
+func (s *SecondFactorAvailableMethodsFixture) TestShouldReturnDefault2FAMethod() {
+	s.mock.Ctx.Providers.Authorizer = authorization.NewAuthorizer(
+		&schema.Configuration{
+			AccessControl: schema.AccessControlConfiguration{
+				DefaultPolicy: "two_factor",
+			},
+		})
+	s.mock.Ctx.Configuration.Default2FAMethod = "totp"
+	ConfigurationGet(s.mock.Ctx)
+	s.mock.Assert200OK(s.T(), configurationBody{
+		AvailableMethods:    []string{"totp", "u2f"},
+		SecondFactorEnabled: true,
+		Default2FAMethod:    "totp",
+	})
+}
+
 func TestRunSuite(t *testing.T) {
 	s := new(SecondFactorAvailableMethodsFixture)
 	suite.Run(t, s)

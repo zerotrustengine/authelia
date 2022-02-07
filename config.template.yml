@@ -27,6 +27,9 @@ jwt_secret: a_very_important_secret
 ## Note: this parameter is optional. If not provided, user won't be redirected upon successful authentication.
 default_redirection_url: https://home.example.com/
 
+# Default 2FA method when a user visits Authelia for the first time
+default_2fa_method: totp
+
 ##
 ## Server Configuration
 ##

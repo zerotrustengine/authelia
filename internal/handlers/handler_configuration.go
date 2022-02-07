@@ -9,6 +9,7 @@ import (
 func ConfigurationGet(ctx *middlewares.AutheliaCtx) {
 	body := configurationBody{}
 	body.AvailableMethods = MethodList{authentication.TOTP, authentication.U2F}
+	body.Default2FAMethod = ctx.Configuration.Default2FAMethod
 
 	if ctx.Configuration.DuoAPI != nil {
 		body.AvailableMethods = append(body.AvailableMethods, authentication.Push)
