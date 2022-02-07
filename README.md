@@ -358,3 +358,5 @@ for providing us with free licenses to their great tools.
 [security]: https://github.com/authelia/authelia/security/policy
 [#support]: https://discord.com/channels/707844280412012608/707844280412012612
 [#contributing]: https://discord.com/channels/707844280412012608/804943261265297408
+
+test
